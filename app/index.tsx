@@ -1,25 +1,35 @@
 import { Stack, Link } from 'expo-router';
 
-import { View } from 'react-native';
-
-import { Button } from '@/components/Button';
-import { Container } from '@/components/Container';
-import { ScreenContent } from '@/components/ScreenContent';
+import { useState } from 'react';
+import { Pressable, TextInput, View, Text } from 'react-native';
 
 export default function Home() {
+  const [search, setSearch] = useState('');
+
+  const performSearch = () => {
+    console.warn('Search: ', search);
+
+    // save this search in database
+
+    // scrape amazon fro this query
+    
+  };
+
   return (
-    <View className={styles.container}>
-      <Stack.Screen options={{ title: 'Home' }} />
-      <Container>
-        <ScreenContent path="app/index.tsx" title="Home"></ScreenContent>
-        <Link href={{ pathname: '/details', params: { name: 'Dan' } }} asChild>
-          <Button title="Show Details" />
-        </Link>
-      </Container>
-    </View>
+    <>
+      <Stack.Screen options={{ title: 'Search' }} />
+
+      <View className="flex-row gap-3 p-3">
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search for a product"
+          className="flex-1 rounded border border-gray-300 bg-white p-3"
+        />
+        <Pressable onPress={performSearch} className="rounded bg-teal-500 p-3">
+          <Text>Search</Text>
+        </Pressable>
+      </View>
+    </>
   );
 }
-
-const styles = {
-  container: 'flex flex-1 bg-white',
-};
