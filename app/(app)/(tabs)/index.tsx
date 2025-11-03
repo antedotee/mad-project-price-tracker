@@ -1,34 +1,79 @@
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, TextInput, View, Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, TextInput, View, Text, FlatList } from 'react-native';
+
+import { useAuth } from '~/contexts/AuthContext';
+import { supabase } from '~/utils/supabase';
+
+dayjs.extend(relativeTime);
 
 export default function Home() {
   const [search, setSearch] = useState('');
+  const [history, setHistory] = useState([]);
+  const { user } = useAuth();
 
-  const performSearch = () => {
-    console.warn('Search: ', search);
+  const fetchHistory = () => {
+    supabase
+      .from('searches')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setHistory(data));
+  };
 
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const performSearch = async () => {
     // save this search in database
+    const { data, error } = await supabase
+      .from('searches')
+      .insert({
+        query: search,
+        user_id: user.id,
+      })
+      .select()
+      .single();
 
-    // scrape amazon fro this query
-
-    router.push('/search');
+    if (data) {
+      router.push(`/search/${data.id}`);
+    }
   };
 
   return (
     <>
       <Stack.Screen options={{ title: 'Search' }} />
+      <View className="flex-1 bg-white">
+        <View className="flex-row gap-3 p-3">
+          <TextInput
+            className="flex-1 border border-gray-300 rounded p-2"
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search for products..."
+          />
+          <Pressable
+            className="bg-blue-500 px-4 py-2 rounded justify-center"
+            onPress={performSearch}
+          >
+            <Text>Search</Text>
+          </Pressable>
+        </View>
 
-      <View className="flex-row gap-3 p-3">
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search for a product"
-          className="flex-1 rounded border border-gray-300 bg-white p-3"
+        <FlatList
+          data={history}
+          contentContainerClassName="p-3 gap-2 "
+          onRefresh={fetchHistory}
+          refreshing={false}
+          renderItem={({ item }) => (
+            <View className=" border-b border-gray-200 pb-2">
+              <Text className="text-lg font-semibold">{item.query}</Text>
+              <Text className="color-gray">{dayjs(item.created_at).fromNow()}</Text>
+            </View>
+          )}
         />
-        <Pressable onPress={performSearch} className="rounded bg-teal-500 p-3">
-          <Text>Search</Text>
-        </Pressable>
       </View>
     </>
   );
