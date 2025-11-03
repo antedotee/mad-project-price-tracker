@@ -1,5 +1,4 @@
-import { Stack, Link } from 'expo-router';
-
+import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, TextInput, View, Text } from 'react-native';
 
@@ -14,7 +13,6 @@ export default function Home() {
     // scrape amazon fro this query
 
     router.push('/search');
-    
   };
 
   return (

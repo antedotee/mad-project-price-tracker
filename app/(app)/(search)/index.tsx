@@ -1,6 +1,6 @@
 import { Text, View, FlatList, Image, Pressable, Linking } from 'react-native';
 
-import dummyProducts from '../../assets/search.json';
+import dummyProducts from '~/assets/search.json';
 
 const products = dummyProducts.slice(0, 20);
 
