@@ -12,6 +12,8 @@ export default function Home() {
     // save this search in database
 
     // scrape amazon fro this query
+
+    router.push('/search');
     
   };
 
