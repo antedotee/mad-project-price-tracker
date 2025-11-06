@@ -5,7 +5,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Clear any stale session on mount (helpful after auth config changes)
   useEffect(() => {
@@ -32,23 +33,20 @@ export default function LoginScreen() {
   }, []);
 
   const validateForm = () => {
-    if (!email.trim()) {
-      Alert.alert('Validation Error', 'Please enter your email address');
-      return false;
-    }
-    if (!email.includes('@')) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
-      return false;
+    const nextErrors: { email?: string; password?: string } = {};
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      nextErrors.email = 'Please enter your email address';
+    } else if (!cleanEmail.includes('@')) {
+      nextErrors.email = 'Please enter a valid email address';
     }
     if (!password.trim()) {
-      Alert.alert('Validation Error', 'Please enter your password');
-      return false;
+      nextErrors.password = 'Please enter your password';
+    } else if (password.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters';
     }
-    if (password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters');
-      return false;
-    }
-    return true;
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const onSignIn = async () => {
@@ -56,6 +54,8 @@ export default function LoginScreen() {
     if (loading) return;
 
     setLoading(true);
+    setErrors((e) => ({ ...e, form: undefined }));
+    setSuccessMessage(null);
     try {
       console.log('Attempting sign in with email:', email.trim());
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -73,44 +73,15 @@ export default function LoginScreen() {
 
       if (error) {
         console.error('Sign in error details:', error);
-        
-        // Handle rate limiting gracefully
-        if (error.status === 429 || error.message?.includes('429') || error.message?.includes('rate limit')) {
-          Alert.alert(
-            'Too Many Requests',
-            'Please wait a moment before trying again. Too many sign-in attempts have been made.',
-          );
-        } 
-        // Handle unconfirmed email
-        else if (
-          error.message?.toLowerCase().includes('email not confirmed') ||
-          error.message?.toLowerCase().includes('not confirmed') ||
-          error.message?.toLowerCase().includes('verify') ||
-          (error.status === 400 && error.message?.toLowerCase().includes('invalid'))
-        ) {
-          Alert.alert(
-            'Email Not Confirmed',
-            'Your email address has not been confirmed yet. Please check your email for a confirmation link, or delete this account from your Supabase dashboard and sign up again.\n\nError: ' + error.message,
-            [
-              { text: 'Switch to Sign Up', onPress: () => setIsSignUp(true) },
-              { text: 'OK' }
-            ]
-          );
-        }
-        // Handle invalid credentials
-        else if (error.status === 400) {
-          Alert.alert(
-            'Sign In Error',
-            'Invalid email or password. If you just signed up with email confirmation enabled, please check your email to confirm your account first.\n\nError: ' + error.message,
-            [
-              { text: 'Try Sign Up', onPress: () => setIsSignUp(true) },
-              { text: 'OK' }
-            ]
-          );
-        }
-        // Generic error
-        else {
-          Alert.alert('Sign In Error', error.message || 'Unable to sign in. Please try again.');
+        const msg = (error.message || '').toLowerCase();
+        if (error.status === 429 || msg.includes('429') || msg.includes('rate limit')) {
+          setErrors({ form: 'Too many attempts. Please wait a moment and try again.' });
+        } else if (msg.includes('email not confirmed') || msg.includes('not confirmed') || msg.includes('verify')) {
+          setErrors({ form: 'Email not confirmed. Please check your inbox for a confirmation link.' });
+        } else if (error.status === 400 || msg.includes('invalid')) {
+          setErrors({ form: 'Invalid email or password.' });
+        } else {
+          setErrors({ form: 'Unable to sign in. Please try again.' });
         }
       } else if (data.user) {
         console.log('Sign in successful, user:', data.user.email);
@@ -118,7 +89,7 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       console.error('Sign in exception:', error);
-      Alert.alert('Sign In Error', error?.message || 'An unexpected error occurred');
+      setErrors({ form: error?.message || 'An unexpected error occurred' });
     } finally {
       setLoading(false);
     }
@@ -129,6 +100,8 @@ export default function LoginScreen() {
     if (loading) return;
 
     setLoading(true);
+    setErrors((e) => ({ ...e, form: undefined }));
+    setSuccessMessage(null);
     try {
       console.log('Starting signup...');
       const { data, error } = await supabase.auth.signUp({
@@ -140,16 +113,17 @@ export default function LoginScreen() {
 
       if (error) {
         console.error('Signup error:', error);
-        setLoading(false);
-        // Handle rate limiting gracefully
-        if (error.status === 429 || error.message?.includes('429') || error.message?.includes('rate limit')) {
-          Alert.alert(
-            'Too Many Requests',
-            'Please wait a moment before trying again. If this persists, you may have reached the signup limit.',
-          );
+        const msg = (error.message || '').toLowerCase();
+        if (error.status === 429 || msg.includes('429') || msg.includes('rate limit')) {
+          setErrors({ form: 'Too many attempts. Please wait a moment and try again.' });
+        } else if (msg.includes('user already registered') || msg.includes('already exists')) {
+          setErrors({ form: 'An account with this email already exists. Try signing in instead.' });
+        } else if (msg.includes('password')) {
+          setErrors({ password: 'Password is too weak. Use at least 6 characters.' });
         } else {
-          Alert.alert('Sign Up Error', error.message);
+          setErrors({ form: error.message || 'Unable to sign up. Please try again.' });
         }
+        setLoading(false);
         return;
       }
 
@@ -163,6 +137,7 @@ export default function LoginScreen() {
           // User is automatically signed in (email confirmation disabled)
           console.log('Session available, user is signed in. Navigating to home...');
           setLoading(false);
+          setSuccessMessage('Account created! Redirecting...');
           // Small delay to ensure AuthContext has updated
           setTimeout(() => {
             console.log('Navigating to home page...');
@@ -172,30 +147,20 @@ export default function LoginScreen() {
           // No session means email confirmation is required
           console.log('Email confirmation required - no session returned');
           setLoading(false);
-          Alert.alert(
-            'Check Your Email',
-            'Please check your email and click the confirmation link to activate your account. After confirming, you can sign in.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  setIsSignUp(false);
-                  setEmail('');
-                  setPassword('');
-                },
-              },
-            ],
-          );
+          setSuccessMessage('Check your email to confirm your account, then sign in.');
+          setIsSignUp(false);
+          setEmail('');
+          setPassword('');
         }
       } else {
         console.warn('No user returned from signup');
         setLoading(false);
-        Alert.alert('Sign Up Error', 'Account creation failed. Please try again.');
+        setErrors({ form: 'Account creation failed. Please try again.' });
       }
     } catch (error: any) {
       console.error('Signup exception:', error);
       setLoading(false);
-      Alert.alert('Sign Up Error', error?.message || 'An unexpected error occurred');
+      setErrors({ form: error?.message || 'An unexpected error occurred' });
     }
   };
 
@@ -207,7 +172,7 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerClassName="flex-grow justify-center px-6 py-8"
         keyboardShouldPersistTaps="handled">
-        <View className="mb-8">
+        <View className="mb-6">
           <Text className="mb-2 text-3xl font-bold text-gray-900">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </Text>
@@ -218,12 +183,26 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        {errors.form && (
+          <View className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+            <Text className="text-sm font-semibold text-red-700">{errors.form}</Text>
+          </View>
+        )}
+        {successMessage && (
+          <View className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+            <Text className="text-sm font-semibold text-green-700">{successMessage}</Text>
+          </View>
+        )}
+
         <View className="mb-6 gap-4">
           <View>
             <Text className="mb-2 text-sm font-semibold text-gray-700">Email</Text>
             <TextInput
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(t) => {
+                setEmail(t);
+                if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+              }}
               placeholder="Enter your email"
               placeholderTextColor="#9CA3AF"
               keyboardType="email-address"
@@ -232,19 +211,28 @@ export default function LoginScreen() {
               editable={!loading}
               className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
             />
+            {errors.email && (
+              <Text className="mt-1 text-xs font-medium text-red-600">{errors.email}</Text>
+            )}
           </View>
 
           <View>
             <Text className="mb-2 text-sm font-semibold text-gray-700">Password</Text>
             <TextInput
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(t) => {
+                setPassword(t);
+                if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+              }}
               placeholder="Enter your password"
               placeholderTextColor="#9CA3AF"
               secureTextEntry
               editable={!loading}
               className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
             />
+            {errors.password && (
+              <Text className="mt-1 text-xs font-medium text-red-600">{errors.password}</Text>
+            )}
           </View>
         </View>
 

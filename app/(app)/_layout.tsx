@@ -1,4 +1,4 @@
-import { Redirect, Slot } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 
 import { useAuth } from '~/contexts/AuthContext';
 
@@ -8,7 +8,8 @@ export default function AppGroupLayout() {
   if (!user) {
     return <Redirect href="/(auth)/login" />;
   }
-  return <Slot />;
+  
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 

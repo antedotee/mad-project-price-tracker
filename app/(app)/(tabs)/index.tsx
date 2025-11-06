@@ -2,20 +2,54 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Link, router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, TextInput, View, Text, FlatList } from 'react-native';
+import { Pressable, TextInput, View, Text, FlatList, Image, Linking } from 'react-native';
 
 import { useAuth } from '~/contexts/AuthContext';
 import { supabase } from '~/utils/supabase';
+import allProducts from '~/assets/products.json';
 
 dayjs.extend(relativeTime);
 
-// Development mode: Skip database calls
-const DEV_MODE_SKIP_DB = __DEV__;
+// Development mode: Use local JSON data for testing
+const DEV_MODE_SKIP_DB = true; // Using local products.json for demo
+
+type Product = (typeof allProducts)[0];
+
+// Function to filter products
+const filterProducts = (products: Product[], query: string): Product[] => {
+  if (!query || !query.trim()) {
+    return products.slice(0, 50); // Show first 50 products by default
+  }
+  
+  const cleanQuery = query.trim().toLowerCase();
+  const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length >= 2);
+  
+  if (searchTerms.length === 0) {
+    return products.slice(0, 50);
+  }
+  
+  const filtered = products.filter((product) => {
+    const name = (product.name || '').toLowerCase();
+    const brand = (product.brand || '').toLowerCase();
+    
+    return searchTerms.some((term) => {
+      return name.includes(term) || (brand && brand.includes(term));
+    });
+  });
+  
+  return filtered.slice(0, 50);
+};
 
 export default function Home() {
   const [search, setSearch] = useState('');
   const [history, setHistory] = useState([]);
+  const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
   const { user } = useAuth();
+  
+  // Load all products on initial mount
+  useEffect(() => {
+    setDisplayedProducts(allProducts.slice(0, 50));
+  }, []);
 
   const fetchHistory = () => {
     if (DEV_MODE_SKIP_DB) {
@@ -51,86 +85,93 @@ export default function Home() {
     }
   }, [user?.id]);
 
-  const performSearch = async () => {
+  // Real-time filtering when search text changes
+  useEffect(() => {
     if (!search.trim()) {
-      return;
+      // Show all products when search is empty
+      setDisplayedProducts(allProducts.slice(0, 50));
+    } else {
+      // Filter products based on search query
+      const filtered = filterProducts(allProducts, search.trim());
+      setDisplayedProducts(filtered);
     }
-
-    // In dev mode, navigate directly to show products from search.json
-    if (DEV_MODE_SKIP_DB) {
-      // Generate a mock ID with the search query encoded
-      const encodedQuery = encodeURIComponent(search.trim());
-      const mockId = `query-${encodedQuery}`;
-      console.log('🔍 Navigating to search results with ID:', mockId);
-      console.log('🔍 Search query:', search.trim());
-      
-      // Store the query in localStorage as a workaround
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem('lastSearchQuery', search.trim());
-        console.log('🔍 Stored search query in localStorage');
-      }
-      
-      const href = `/search/${mockId}`;
-      console.log('🔍 Href:', href);
-      router.push(href);
-      return;
-    }
-
-    if (!user?.id) {
-      console.log('No user ID available');
-      return;
-    }
-
-    // save this search in database
-    const { data, error } = await supabase
-      .from('searches')
-      .insert({
-        query: search,
-        user_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.log('Error creating search:', error.message);
-      return;
-    }
-
-    if (data) {
-      router.push(`/search/${data.id}`);
-    }
-  };
+  }, [search]);
 
   return (
-    <View className="flex-1 bg-white">
-      <Stack.Screen options={{ title: 'Search' }} />
+    <View className="flex-1 bg-gray-50">
+      <Stack.Screen options={{ title: 'Price Tracker' }} />
 
-      <View className="flex-row gap-3 p-3">
+      {/* Search Section */}
+      <View className="bg-white px-6 py-6 shadow-sm">
+        <Text className="mb-2 text-2xl font-bold text-gray-900">Search Products</Text>
+        <Text className="mb-4 text-sm text-gray-600">
+          Browse 36,000+ Amazon products - Start typing to filter
+        </Text>
+        
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Search for a product"
-          className="flex-1 rounded border border-gray-300 bg-white p-3"
+          placeholder="Type to search: iPhone, Laptop..."
+          placeholderTextColor="#9CA3AF"
+          returnKeyType="search"
+          className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
         />
-        <Pressable onPress={performSearch} className="rounded bg-teal-500 p-3">
-          <Text>Search</Text>
-        </Pressable>
       </View>
 
-      <FlatList
-        data={history}
-        contentContainerClassName="p-3 gap-2 "
-        onRefresh={fetchHistory}
-        refreshing={false}
-        renderItem={({ item }) => (
-          <Link href={`/search/${item.id}`} asChild>
-            <Pressable className=" border-b border-gray-200 pb-2">
-              <Text className="text-lg font-semibold">{item.query}</Text>
-              <Text className="color-gray">{dayjs(item.created_at).fromNow()}</Text>
-            </Pressable>
-          </Link>
+      {/* Products Section */}
+      <View className="mt-4 flex-1 px-6">
+        <View className="mb-3 flex-row items-center justify-between">
+          <Text className="text-lg font-bold text-gray-900">
+            {search.trim() ? `Results for "${search}"` : 'All Products'}
+          </Text>
+          <Text className="text-sm text-gray-500">
+            {displayedProducts.length} products
+          </Text>
+        </View>
+        
+        {displayedProducts.length === 0 ? (
+          <View className="mt-8 items-center justify-center">
+            <Text className="text-center text-base text-gray-500">
+              No products found.{'\n'}Try a different search term!
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={displayedProducts}
+            contentContainerClassName="gap-3 pb-6"
+            showsVerticalScrollIndicator={true}
+            keyExtractor={(item) => item?.asin || String(Math.random())}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => item?.url && Linking.openURL(item.url)}
+                className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
+                {item?.image && (
+                  <Image 
+                    source={{ uri: item.image }} 
+                    className="h-24 w-24 rounded-md bg-gray-100" 
+                    resizeMode="contain"
+                  />
+                )}
+                <View className="flex-1 justify-between">
+                  <Text className="text-sm text-gray-900" numberOfLines={3}>
+                    {item?.name || 'Product'}
+                  </Text>
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <Text className="text-lg font-bold text-teal-600">
+                      ${item?.final_price || 'N/A'}
+                    </Text>
+                    {item?.rating && (
+                      <Text className="text-xs text-gray-500">
+                        ⭐ {item.rating} ({item.num_ratings || 0})
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            )}
+          />
         )}
-      />
+      </View>
     </View>
   );
 }

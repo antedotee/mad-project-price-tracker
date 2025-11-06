@@ -14,12 +14,12 @@ import {
   TextInput,
 } from 'react-native';
 
-import dummyProducts from '~/assets/search.json';
+import allProducts from '~/assets/products.json';
 import { supabase } from '~/utils/supabase';
 
 dayjs.extend(relativeTime);
 
-type Product = (typeof dummyProducts)[0];
+type Product = (typeof allProducts)[0];
 type Search = {
   id: string;
   query: string;
@@ -28,8 +28,8 @@ type Search = {
   user_id: string;
 };
 
-// Development mode: Skip database calls and use search.json data
-const DEV_MODE_SKIP_DB = __DEV__;
+// Development mode: Use local JSON data for testing
+const DEV_MODE_SKIP_DB = true; // Using local products.json for demo
 
 // Function to filter products based on search query
 const filterProductsByQuery = (products: Product[], query: string): Product[] => {
@@ -226,7 +226,7 @@ export default function SearchResultScreen() {
         } else {
           console.warn('⚠️ No query found in localStorage, showing first 20 products');
           console.warn('⚠️ Make sure you searched from the home page to store the query');
-          setProducts(dummyProducts.slice(0, 20));
+          setProducts(allProducts.slice(0, 20));
           setIsLoading(false);
           return;
         }
@@ -239,7 +239,7 @@ export default function SearchResultScreen() {
         console.log('🔍 ID received:', idString);
         console.log('🔍 Query extracted:', `"${query}"`);
         console.log('🔍 Query length:', query.length);
-        console.log('🔍 Total products available:', dummyProducts.length);
+        console.log('🔍 Total products available:', allProducts.length);
         
         // Set search query in the input field
         setSearchQuery(query);
@@ -255,14 +255,14 @@ export default function SearchResultScreen() {
         // CRITICAL: Always filter when we have a non-empty query
         if (query && query.trim().length > 0) {
           console.log('🔍 Filtering products with query:', query);
-          const filteredProducts = filterProductsByQuery(dummyProducts, query);
-          console.log(`✅ Filtered ${filteredProducts.length} products from ${dummyProducts.length} total`);
+          const filteredProducts = filterProductsByQuery(allProducts, query);
+          console.log(`✅ Filtered ${filteredProducts.length} products from ${allProducts.length} total`);
           
           // Verify the filter actually worked
-          if (filteredProducts.length === dummyProducts.length) {
+          if (filteredProducts.length === allProducts.length) {
             console.error('❌ ERROR: Filter returned ALL products! Query was:', query);
             // Force a strict filter
-            const strictFiltered = dummyProducts.filter(p => {
+            const strictFiltered = allProducts.filter(p => {
               const name = (p.name || '').toLowerCase();
               const keyword = (p.keyword || '').toLowerCase();
               const searchTerm = query.toLowerCase().trim();
@@ -276,13 +276,13 @@ export default function SearchResultScreen() {
           }
         } else {
           console.warn('⚠️ Empty query detected, showing first 20');
-          setProducts(dummyProducts.slice(0, 20));
+          setProducts(allProducts.slice(0, 20));
         }
       } else {
         // If no id, show first 20 products
         console.log('⚠️ No valid ID, showing first 20 products');
         console.log('⚠️ ID string was:', `"${idString}"`);
-        setProducts(dummyProducts.slice(0, 20));
+        setProducts(allProducts.slice(0, 20));
       }
       setIsLoading(false);
       return;
@@ -325,7 +325,7 @@ export default function SearchResultScreen() {
         });
     } else {
       // If no valid id, show dummy products
-      setProducts(dummyProducts.slice(0, 20));
+      setProducts(allProducts.slice(0, 20));
       setIsLoading(false);
     }
   }, [id]);
@@ -348,7 +348,7 @@ export default function SearchResultScreen() {
     if (DEV_MODE_SKIP_DB) {
       const encodedQuery = encodeURIComponent(searchQuery.trim());
       const mockId = `query-${encodedQuery}`;
-      router.push(`/search/${mockId}`);
+      router.replace(`/search/${mockId}`);
     }
   };
 
@@ -357,68 +357,112 @@ export default function SearchResultScreen() {
       <Stack.Screen options={{ title: search?.query || 'Search Results' }} />
       
       {/* Search Bar */}
-      <View className="flex-row gap-3 border-b border-gray-200 bg-white p-3">
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search for a product"
-          onSubmitEditing={handleNewSearch}
-          returnKeyType="search"
-          className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2"
-        />
-        <Pressable onPress={handleNewSearch} className="rounded-lg bg-teal-600 px-4 py-2">
-          <Text className="font-semibold text-white">Search</Text>
-        </Pressable>
+      <View className="bg-white px-6 py-4 shadow-sm">
+        <View className="flex-row gap-3">
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search for a product"
+            placeholderTextColor="#9CA3AF"
+            onSubmitEditing={handleNewSearch}
+            returnKeyType="search"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+          />
+          <Pressable 
+            onPress={handleNewSearch} 
+            className="items-center justify-center rounded-lg bg-teal-600 px-6 py-3 shadow-sm active:bg-teal-700">
+            <Text className="text-base font-semibold text-white">Search</Text>
+          </Pressable>
+        </View>
       </View>
 
+      {/* Search Info Card */}
       {search && (
-        <View className="m-2 gap-2 rounded-lg bg-white p-3 shadow-sm">
-          <Text className="text-xl font-semibold">{search.query}</Text>
-          <Text className="text-gray-600">{dayjs(search.created_at).fromNow()}</Text>
-          <Text className="text-gray-600">Status: {search.status}</Text>
-          {!DEV_MODE_SKIP_DB && (
-            <Button title="Start scraping" onPress={startScraping} />
+        <View className="mx-6 mt-4 gap-3 rounded-lg bg-white p-4 shadow-sm">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="mb-1 text-lg font-bold text-gray-900">{search.query}</Text>
+              <Text className="text-sm text-gray-500">
+                {dayjs(search.created_at).fromNow()}
+              </Text>
+            </View>
+            <View className={`rounded-full px-3 py-1 ${
+              search.status === 'Done' ? 'bg-green-100' : 
+              search.status === 'Scraping' ? 'bg-blue-100' : 
+              'bg-gray-100'
+            }`}>
+              <Text className={`text-xs font-semibold ${
+                search.status === 'Done' ? 'text-green-700' : 
+                search.status === 'Scraping' ? 'text-blue-700' : 
+                'text-gray-700'
+              }`}>
+                {search.status}
+              </Text>
+            </View>
+          </View>
+          
+          {!DEV_MODE_SKIP_DB && search.status === 'Pending' && (
+            <Pressable
+              onPress={startScraping}
+              className="rounded-lg bg-teal-600 py-3 shadow-sm active:bg-teal-700">
+              <Text className="text-center text-sm font-semibold text-white">
+                Start Scraping
+              </Text>
+            </Pressable>
           )}
         </View>
       )}
       
-
-      {products.length === 0 ? (
-        <View className="flex-1 items-center justify-center p-8">
-          <Text className="text-lg font-semibold text-gray-700">No products found</Text>
-          <Text className="mt-2 text-center text-gray-500">
-            {search
-              ? `No products match your search for "${search.query}"`
-              : 'Try searching for a product'}
-          </Text>
-        </View>
-      ) : (
-        <View className="mb-2 px-2">
-          <Text className="text-sm text-gray-600">
-            Found {products.length} product{products.length !== 1 ? 's' : ''}
-            {search && ` for "${search.query}"`}
+      {/* Results Count */}
+      {products.length > 0 && (
+        <View className="mx-6 mt-4">
+          <Text className="text-sm font-semibold text-gray-700">
+            {products.length} product{products.length !== 1 ? 's' : ''} found
           </Text>
         </View>
       )}
 
-      <FlatList
-        data={products}
-        contentContainerClassName="gap-2 p-2"
-        keyExtractor={(item) => item?.asin || String(Math.random())}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => item?.url && Linking.openURL(item.url)}
-            className="flex-row gap-2 bg-white p-3">
-            {item?.image && (
-              <Image source={{ uri: item.image }} className="h-20 w-20" />
-            )}
-            <Text className="flex-1" numberOfLines={4}>
-              {item?.name || 'Product'}
-            </Text>
-            <Text>$ {item?.final_price || 'N/A'}</Text>
-          </Pressable>
-        )}
-      />
+      {/* Products List */}
+      {products.length === 0 ? (
+        <View className="flex-1 items-center justify-center px-8">
+          <Text className="mb-2 text-center text-lg font-bold text-gray-900">
+            No products found
+          </Text>
+          <Text className="text-center text-base text-gray-500">
+            {search
+              ? `No products match your search for "${search.query}"`
+              : 'Try searching for a product above'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          contentContainerClassName="gap-3 px-6 py-4 pb-6"
+          showsVerticalScrollIndicator={false}
+          keyExtractor={(item) => item?.asin || String(Math.random())}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => item?.url && Linking.openURL(item.url)}
+              className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
+              {item?.image && (
+                <Image 
+                  source={{ uri: item.image }} 
+                  className="h-24 w-24 rounded-md bg-gray-100" 
+                  resizeMode="contain"
+                />
+              )}
+              <View className="flex-1 justify-between">
+                <Text className="text-sm text-gray-900" numberOfLines={3}>
+                  {item?.name || 'Product'}
+                </Text>
+                <Text className="mt-2 text-lg font-bold text-teal-600">
+                  ${item?.final_price || 'N/A'}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
     </View>
   );
 }
