@@ -183,6 +183,38 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        {/* Sign In / Sign Up segmented control for mobile */}
+        <View className="mb-6 flex-row rounded-lg border border-gray-200 bg-white p-1">
+          <Pressable
+            onPress={() => {
+              if (isSignUp) {
+                setIsSignUp(false);
+                setErrors({});
+                setSuccessMessage(null);
+              }
+            }}
+            className={`flex-1 rounded-md py-2 ${!isSignUp ? 'bg-teal-600' : ''}`}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Switch to Sign In">
+            <Text className={`text-center text-sm font-semibold ${!isSignUp ? 'text-white' : 'text-gray-700'}`}>Sign In</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              if (!isSignUp) {
+                setIsSignUp(true);
+                setErrors({});
+                setSuccessMessage(null);
+              }
+            }}
+            className={`flex-1 rounded-md py-2 ${isSignUp ? 'bg-teal-600' : ''}`}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Switch to Sign Up">
+            <Text className={`text-center text-sm font-semibold ${isSignUp ? 'text-white' : 'text-gray-700'}`}>Sign Up</Text>
+          </Pressable>
+        </View>
+
         {errors.form && (
           <View className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <Text className="text-sm font-semibold text-red-700">{errors.form}</Text>
@@ -270,7 +302,14 @@ export default function LoginScreen() {
           <Text className="text-gray-600">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
           </Text>
-          <Pressable onPress={() => setIsSignUp(!isSignUp)} disabled={loading}>
+          <Pressable
+            onPress={() => {
+              setIsSignUp(!isSignUp);
+              setErrors({});
+              setSuccessMessage(null);
+            }}
+            hitSlop={10}
+            disabled={loading}>
             <Text className="font-semibold text-teal-600 active:text-teal-700">
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </Text>
