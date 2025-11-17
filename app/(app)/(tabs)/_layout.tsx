@@ -1,6 +1,6 @@
-import { Redirect, Tabs } from 'expo-router';
-import { Modal, Pressable, Text, View } from 'react-native';
-import { useState } from 'react';
+import { Redirect, Tabs, useRouter, useFocusEffect } from 'expo-router';
+import { Modal, Pressable, Text, View, Image } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
 
 import { TabBarIcon } from '~/components/TabBarIcon';
 import { useAuth } from '~/contexts/AuthContext';
@@ -8,7 +8,47 @@ import { supabase } from '~/utils/supabase';
 
 export default function TabLayout() {
   const { user } = useAuth();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchProfilePhoto();
+    }
+  }, [user]);
+
+  // Refresh profile photo when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchProfilePhoto();
+      }
+    }, [user])
+  );
+
+  const fetchProfilePhoto = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('profile_photo_url')
+        .eq('id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error fetching profile photo:', error);
+        return;
+      }
+
+      if (data?.profile_photo_url) {
+        setProfilePhotoUrl(data.profile_photo_url);
+      }
+    } catch (error) {
+      console.error('Error fetching profile photo:', error);
+    }
+  };
 
   if (!user) {
     return <Redirect href="/(auth)/login" />;
@@ -16,6 +56,11 @@ export default function TabLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const handleProfilePress = () => {
+    setMenuOpen(false);
+    router.push('/profile');
   };
 
   return (
@@ -34,10 +79,17 @@ export default function TabLayout() {
             <View className="mr-4" style={{ position: 'relative' }}>
               <Pressable
                 onPress={() => setMenuOpen((v) => !v)}
-                className="h-9 w-9 items-center justify-center rounded-full bg-teal-600">
-                <Text className="text-sm font-bold text-white">
-                  {user.email?.[0]?.toUpperCase() || 'U'}
-                </Text>
+                className="h-9 w-9 items-center justify-center rounded-full bg-teal-600 overflow-hidden">
+                {profilePhotoUrl ? (
+                  <Image
+                    source={{ uri: profilePhotoUrl }}
+                    className="h-9 w-9 rounded-full"
+                  />
+                ) : (
+                  <Text className="text-sm font-bold text-white">
+                    {user.email?.[0]?.toUpperCase() || 'U'}
+                  </Text>
+                )}
               </Pressable>
               {/* Dropdown handled via Modal below */}
             </View>
@@ -72,6 +124,11 @@ export default function TabLayout() {
             <Text className="mb-3 truncate text-sm font-semibold text-gray-800">
               {user.email}
             </Text>
+            <Pressable
+              onPress={handleProfilePress}
+              className="mb-2 rounded-lg bg-teal-600 py-2 active:bg-teal-700">
+              <Text className="text-center text-sm font-semibold text-white">Profile</Text>
+            </Pressable>
             <Pressable
               onPress={() => {
                 setMenuOpen(false);
