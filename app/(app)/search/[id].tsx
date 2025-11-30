@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useLocalSearchParams, router, Stack, useSegments, usePathname } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Text,
   View,
@@ -10,7 +10,6 @@ import {
   Pressable,
   Linking,
   ActivityIndicator,
-  Button,
   TextInput,
 } from 'react-native';
 
@@ -73,10 +72,9 @@ const filterProductsByQuery = (products: Product[], query: string): Product[] =>
 };
 
 export default function SearchResultScreen() {
-  const params = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const segments = useSegments();
   const pathname = usePathname();
-  const id = params.id;
   const [search, setSearch] = useState<Search | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +92,7 @@ export default function SearchResultScreen() {
       try {
         const decoded = decodeURIComponent(encodedQuery);
         return decoded.trim();
-      } catch (e) {
+      } catch {
         return encodedQuery.trim();
       }
     }
@@ -102,9 +100,44 @@ export default function SearchResultScreen() {
     return idString.trim();
   };
 
+  const fetchSearch = useCallback(() => {
+    if (!id || id === 'search') return;
+    
+    const searchId = Array.isArray(id) ? id[0] : id;
+    supabase
+      .from('searches')
+      .select('*')
+      .eq('id', searchId)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.log('Error fetching search:', error.message);
+          return;
+        }
+        setSearch(data);
+      });
+  }, [id]);
+
+  const fetchProducts = useCallback(() => {
+    if (!id || id === 'search') return;
+    
+    const searchId = Array.isArray(id) ? id[0] : id;
+    supabase
+      .from('product_search')
+      .select('*, products(*)')
+      .eq('search_id', searchId)
+      .then(({ data, error }) => {
+        console.log(data, error);
+        if (error) {
+          console.log('Error fetching products:', error.message);
+          return;
+        }
+        setProducts(data?.map((d) => d.products) || []);
+      });
+  }, [id]);
+
   useEffect(() => {
     // Debug: Log all params and route info
-    console.log('🔍 All params:', JSON.stringify(params, null, 2));
     console.log('🔍 ID value:', id);
     console.log('🔍 ID type:', typeof id);
     console.log('🔍 ID is array:', Array.isArray(id));
@@ -140,13 +173,11 @@ export default function SearchResultScreen() {
         idString = idFromUrl;
         console.log('✅ Using ID from browser URL:', idString);
       }
-      // PRIORITY 2: Try params
+      // PRIORITY 2: Try id from params
       else if (Array.isArray(id)) {
         idString = id[0] || '';
       } else if (id && id !== 'search') {
         idString = id.toString();
-      } else if (params.id && params.id !== 'search') {
-        idString = Array.isArray(params.id) ? params.id[0] : params.id.toString();
       }
       
       // If still no ID, try to extract from pathname
@@ -291,44 +322,47 @@ export default function SearchResultScreen() {
     // Real database calls (only if not in dev mode)
     if (id && id !== 'search') {
       setIsLoading(true);
-      supabase
-        .from('searches')
-        .select('*')
-        .eq('id', id)
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.log('Error fetching search:', error.message);
-            setIsLoading(false);
-            return;
-          }
-          setSearch(data);
-          setIsLoading(false);
-        });
-
-      supabase
-        .from('product_search')
-        .select('*, products(*)')
-        .eq('search_id', id)
-        .then(({ data, error }) => {
-          if (error) {
-            console.log('Error fetching products:', error.message);
-            // Keep default products on error
-            return;
-          }
-          if (data && data.length > 0) {
-            const dbProducts = data.map((d) => d.products).filter(Boolean);
-            if (dbProducts.length > 0) {
-              setProducts(dbProducts);
-            }
-          }
-        });
+      fetchSearch();
+      fetchProducts();
+      setIsLoading(false);
     } else {
       // If no valid id, show dummy products
       setProducts(allProducts.slice(0, 20));
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, fetchSearch, fetchProducts, pathname, segments]);
+
+  useEffect(() => {
+    if (DEV_MODE_SKIP_DB) return;
+    
+    fetchSearch();
+    fetchProducts();
+  }, [id, fetchSearch, fetchProducts]);
+
+  useEffect(() => {
+    if (DEV_MODE_SKIP_DB) return;
+    
+    // Listen to inserts
+    const subscription = supabase
+      .channel('supabase_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'searches' },
+        (payload) => {
+          console.log(JSON.stringify(payload.new, null, 2));
+          const searchId = Array.isArray(id) ? id[0] : id;
+          if (payload.new?.id === parseInt(searchId, 10)) {
+            setSearch(payload.new as Search);
+            fetchProducts();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [id, fetchProducts]);
 
   const startScraping = async () => {
     const { data, error } = await supabase.functions.invoke('scrape-start', {
@@ -447,7 +481,7 @@ export default function SearchResultScreen() {
               {item?.image && (
                 <Image 
                   source={{ uri: item.image }} 
-                  className="h-24 w-24 rounded-md bg-gray-100" 
+                  className="h-20 w-20 rounded-md bg-gray-100" 
                   resizeMode="contain"
                 />
               )}
