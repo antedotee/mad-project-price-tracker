@@ -1,11 +1,12 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Link, router, Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack } from 'expo-router';
+import { useEffect, useState, useCallback } from 'react';
 import { Pressable, TextInput, View, Text, FlatList, Image, Linking } from 'react-native';
 
 import { useAuth } from '~/contexts/AuthContext';
 import { supabase } from '~/utils/supabase';
+import { Tables } from '~/types/supabase';
 import allProducts from '~/assets/products.json';
 
 dayjs.extend(relativeTime);
@@ -42,7 +43,7 @@ const filterProducts = (products: Product[], query: string): Product[] => {
 
 export default function Home() {
   const [search, setSearch] = useState('');
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<Tables<'searches'>[]>([]);
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
   const { user } = useAuth();
   
@@ -51,14 +52,18 @@ export default function Home() {
     setDisplayedProducts(allProducts.slice(0, 50));
   }, []);
 
-  const fetchHistory = () => {
+  const fetchHistory = useCallback(() => {
     if (DEV_MODE_SKIP_DB) {
       // In dev mode, skip database calls
       setHistory([]);
       return;
     }
 
-    if (!user?.id) return;
+    if (!user) {
+      return;
+    }
+
+    if (!user.id) return;
     
     supabase
       .from('searches')
@@ -72,7 +77,7 @@ export default function Home() {
         }
         setHistory(data || []);
       });
-  };
+  }, [user]);
 
   useEffect(() => {
     if (DEV_MODE_SKIP_DB) {
@@ -83,7 +88,7 @@ export default function Home() {
     if (user?.id) {
       fetchHistory();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchHistory]);
 
   // Real-time filtering when search text changes
   useEffect(() => {
@@ -96,6 +101,10 @@ export default function Home() {
       setDisplayedProducts(filtered);
     }
   }, [search]);
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <View className="flex-1 bg-gray-50">
