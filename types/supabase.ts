@@ -72,20 +72,14 @@ export interface Database {
       }
       product_search: {
         Row: {
-          id: string
-          created_at: string
           asin: string
           search_id: string
         }
         Insert: {
-          id?: string
-          created_at?: string
           asin: string
           search_id: string
         }
         Update: {
-          id?: string
-          created_at?: string
           asin?: string
           search_id?: string
         }

@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS searches (
   snapshot_id TEXT,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE
 );
-
 -- Create products table
 CREATE TABLE IF NOT EXISTS products (
   asin TEXT PRIMARY KEY,
@@ -20,7 +19,6 @@ CREATE TABLE IF NOT EXISTS products (
   final_price NUMERIC,
   currency TEXT DEFAULT 'USD'
 );
-
 -- Create product_search junction table (many-to-many relationship)
 CREATE TABLE IF NOT EXISTS product_search (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,50 +27,41 @@ CREATE TABLE IF NOT EXISTS product_search (
   search_id UUID REFERENCES searches(id) ON DELETE CASCADE,
   UNIQUE(asin, search_id)
 );
-
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_searches_user_id ON searches(user_id);
 CREATE INDEX IF NOT EXISTS idx_searches_created_at ON searches(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_product_search_search_id ON product_search(search_id);
 CREATE INDEX IF NOT EXISTS idx_product_search_asin ON product_search(asin);
-
 -- Enable Row Level Security (RLS)
 ALTER TABLE searches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_search ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for searches table
 -- Users can only see their own searches
 CREATE POLICY "Users can view their own searches"
   ON searches FOR SELECT
   USING (auth.uid() = user_id);
-
 -- Users can insert their own searches
 CREATE POLICY "Users can insert their own searches"
   ON searches FOR INSERT
   WITH CHECK (auth.uid() = user_id);
-
 -- Users can update their own searches
 CREATE POLICY "Users can update their own searches"
   ON searches FOR UPDATE
   USING (auth.uid() = user_id);
-
 -- Service role can update any search (for edge functions)
 CREATE POLICY "Service role can update searches"
   ON searches FOR UPDATE
   USING (auth.jwt()->>'role' = 'service_role');
-
 -- RLS Policies for products table
 -- Anyone authenticated can view products
 CREATE POLICY "Authenticated users can view products"
   ON products FOR SELECT
   USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
-
 -- Service role can insert/update products (for edge functions)
 CREATE POLICY "Service role can manage products"
   ON products FOR ALL
   USING (auth.jwt()->>'role' = 'service_role');
-
 -- RLS Policies for product_search table
 -- Users can view product_search entries for their searches
 CREATE POLICY "Users can view product_search for their searches"
@@ -84,16 +73,13 @@ CREATE POLICY "Users can view product_search for their searches"
       AND searches.user_id = auth.uid()
     )
   );
-
 -- Service role can manage product_search (for edge functions)
 CREATE POLICY "Service role can manage product_search"
   ON product_search FOR ALL
   USING (auth.jwt()->>'role' = 'service_role');
-
 -- Enable pg_net extension for HTTP requests from triggers
 -- This extension allows database triggers to make HTTP requests
 CREATE EXTENSION IF NOT EXISTS pg_net;
-
 -- Create a function to invoke the edge function
 CREATE OR REPLACE FUNCTION invoke_scrape_start()
 RETURNS TRIGGER AS $$
@@ -135,15 +121,12 @@ EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Create trigger that fires after a new search is inserted
 CREATE TRIGGER trigger_scrape_start
   AFTER INSERT ON searches
   FOR EACH ROW
   EXECUTE FUNCTION invoke_scrape_start();
-
 -- Comment explaining the schema
 COMMENT ON TABLE searches IS 'Stores user search queries and their scraping status';
 COMMENT ON TABLE products IS 'Stores Amazon product information scraped from BrightData';
 COMMENT ON TABLE product_search IS 'Junction table linking products to searches (many-to-many)';
-
