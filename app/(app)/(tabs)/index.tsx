@@ -1,8 +1,8 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Stack } from 'expo-router';
+import { Stack, Link } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
-import { Pressable, TextInput, View, Text, FlatList, Image, Linking } from 'react-native';
+import { Pressable, TextInput, View, Text, FlatList, Image } from 'react-native';
 
 import { useAuth } from '~/contexts/AuthContext';
 import { supabase } from '~/utils/supabase';
@@ -151,34 +151,35 @@ export default function Home() {
             showsVerticalScrollIndicator={true}
             keyExtractor={(item) => item?.asin || String(Math.random())}
             renderItem={({ item }) => (
-              <Pressable
-                onPress={() => item?.url && Linking.openURL(item.url)}
-                className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
-                {item?.image && (
-                  <Image 
-                    source={{ uri: item.image }} 
-                    className="h-24 w-24 rounded-md bg-gray-100" 
-                    resizeMode="contain"
-                  />
-                )}
-                <View className="flex-1 justify-between">
-                  {[
-                    <Text key="name" className="text-sm text-gray-900" numberOfLines={3}>
-                      {item?.name || 'Product'}
-                    </Text>,
-                    <View key="meta" className="mt-2 flex-row items-center justify-between">
-                      <Text className="text-lg font-bold text-teal-600">
-                        {`$${String(item?.final_price ?? 'N/A')}`}
-                      </Text>
-                      {item?.rating ? (
-                        <Text className="text-xs text-gray-500">
-                          {`⭐ ${item.rating} (${item.num_ratings || 0})`}
+              <Link href={`/product/${item.asin}`} asChild>
+                <Pressable
+                  className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
+                  {item?.image && (
+                    <Image 
+                      source={{ uri: item.image }} 
+                      className="h-24 w-24 rounded-md bg-gray-100" 
+                      resizeMode="contain"
+                    />
+                  )}
+                  <View className="flex-1 justify-between">
+                    {[
+                      <Text key="name" className="text-sm text-gray-900" numberOfLines={3}>
+                        {item?.name || 'Product'}
+                      </Text>,
+                      <View key="meta" className="mt-2 flex-row items-center justify-between">
+                        <Text className="text-lg font-bold text-teal-600">
+                          {`$${String(item?.final_price ?? 'N/A')}`}
                         </Text>
-                      ) : null}
-                    </View>,
-                  ]}
-                </View>
-              </Pressable>
+                        {item?.rating ? (
+                          <Text className="text-xs text-gray-500">
+                            {`⭐ ${item.rating} (${item.num_ratings || 0})`}
+                          </Text>
+                        ) : null}
+                      </View>,
+                    ]}
+                  </View>
+                </Pressable>
+              </Link>
             )}
           />
         )}
