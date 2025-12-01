@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { useLocalSearchParams, router, Stack, useSegments, usePathname } from 'expo-router';
+import { useLocalSearchParams, router, Stack, useSegments, usePathname, Link } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Text,
@@ -475,25 +475,27 @@ export default function SearchResultScreen() {
           showsVerticalScrollIndicator={false}
           keyExtractor={(item) => item?.asin || String(Math.random())}
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() => item?.url && Linking.openURL(item.url)}
-              className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
-              {item?.image && (
-                <Image 
-                  source={{ uri: item.image }} 
-                  className="h-20 w-20 rounded-md bg-gray-100" 
-                  resizeMode="contain"
-                />
-              )}
-              <View className="flex-1 justify-between">
-                <Text className="text-sm text-gray-900" numberOfLines={3}>
-                  {item?.name || 'Product'}
-                </Text>
-                <Text className="mt-2 text-lg font-bold text-teal-600">
-                  ${item?.final_price || 'N/A'}
-                </Text>
-              </View>
-            </Pressable>
+            <Link href={`/product/${item.asin}`} asChild>
+              <Pressable
+                // onPress={() => Linking.openURL(item.url)}
+                className="flex-row gap-4 rounded-lg bg-white p-4 shadow-sm active:bg-gray-50">
+                {item?.image && (
+                  <Image 
+                    source={{ uri: item.image }} 
+                    className="h-20 w-20 rounded-md bg-gray-100" 
+                    resizeMode="contain"
+                  />
+                )}
+                <View className="flex-1 justify-between">
+                  <Text className="text-sm text-gray-900" numberOfLines={3}>
+                    {item?.name || 'Product'}
+                  </Text>
+                  <Text className="mt-2 text-lg font-bold text-teal-600">
+                    ${item?.final_price || 'N/A'}
+                  </Text>
+                </View>
+              </Pressable>
+            </Link>
           )}
         />
       )}
