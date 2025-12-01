@@ -84,6 +84,26 @@ export interface Database {
           search_id?: string
         }
       }
+      product_snapshot: {
+        Row: {
+          id: number
+          created_at: string
+          asin: string
+          final_price: number
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          asin: string
+          final_price: number
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          asin?: string
+          final_price?: number
+        }
+      }
       profiles: {
         Row: {
           id: string

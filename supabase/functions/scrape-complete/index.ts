@@ -116,6 +116,27 @@ Deno.serve(async (req) => {
 
     console.log(`Successfully linked ${productSearchLinks.length} products to search`);
 
+    // Save product snapshots for historical price tracking
+    const productSnapshots = reqJson
+      .filter((p: any) => p.asin && p.final_price) // Only include products with asin and final_price
+      .map((p: any) => ({
+        asin: p.asin,
+        final_price: parseFloat(p.final_price),
+      }));
+
+    if (productSnapshots.length > 0) {
+      const { error: productSnapshotsError } = await supabase
+        .from("product_snapshot")
+        .insert(productSnapshots);
+
+      if (productSnapshotsError) {
+        console.error("Error saving product snapshots:", productSnapshotsError);
+        // Don't throw - snapshot errors shouldn't fail the entire scrape
+      } else {
+        console.log(`Successfully saved ${productSnapshots.length} product snapshots`);
+      }
+    }
+
     // Update search status to Done
     const { error: searchesError } = await supabase
       .from("searches")
