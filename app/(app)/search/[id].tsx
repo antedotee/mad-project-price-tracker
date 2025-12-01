@@ -28,6 +28,7 @@ type Search = {
   status: string;
   user_id: string;
   is_tracked?: boolean | null;
+  last_scraped_at?: string | null;
 };
 
 // Development mode: Use local JSON data for testing
@@ -439,6 +440,9 @@ export default function SearchResultScreen() {
               <Text className="text-sm text-gray-500">
                 {dayjs(search.created_at).fromNow()}
               </Text>
+              {search.last_scraped_at && (
+                <Text>Scraped {dayjs(search.last_scraped_at).fromNow()}</Text>
+              )}
               <Text className="text-xs text-gray-400">{search.status}</Text>
             </View>
             <Pressable onPress={toggleIsTracked} className="p-2">

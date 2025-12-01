@@ -38,6 +38,9 @@ export default function SearchListItem({ search, onToggleTracked }: SearchListIt
         <View className="flex-1">
           <Text className="text-xl font-semibold">{search.query}</Text>
           <Text className="text-sm text-gray-500">{dayjs(search.created_at).fromNow()}</Text>
+          {search.last_scraped_at && (
+            <Text className="color-gray">Scraped {dayjs(search.last_scraped_at).fromNow()}</Text>
+          )}
           <Text className="text-xs text-gray-400">{search.status}</Text>
         </View>
         <Pressable
