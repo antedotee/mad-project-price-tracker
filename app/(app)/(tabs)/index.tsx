@@ -4,6 +4,7 @@ import { Stack, Link } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import { Pressable, TextInput, View, Text, FlatList, Image } from 'react-native';
 
+import SearchListItem from '~/components/SearchListItem';
 import { useAuth } from '~/contexts/AuthContext';
 import { supabase } from '~/utils/supabase';
 import { Tables } from '~/types/supabase';

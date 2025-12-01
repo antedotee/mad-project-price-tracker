@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import { Octicons } from '@expo/vector-icons';
+import { Button } from '~/components/Button';
 
 import allProducts from '~/assets/products.json';
 import { supabase } from '~/utils/supabase';
@@ -25,6 +27,7 @@ type Search = {
   created_at: string;
   status: string;
   user_id: string;
+  is_tracked?: boolean | null;
 };
 
 // Development mode: Use local JSON data for testing
@@ -371,6 +374,23 @@ export default function SearchResultScreen() {
     console.log(data, error);
   };
 
+  const toggleIsTracked = async () => {
+    if (!search?.id) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('searches')
+      .update({ is_tracked: !search?.is_tracked })
+      .eq('id', search?.id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setSearch(data as Search);
+    }
+  };
+
   if (isLoading && !DEV_MODE_SKIP_DB) {
     return <ActivityIndicator />;
   }
@@ -419,30 +439,22 @@ export default function SearchResultScreen() {
               <Text className="text-sm text-gray-500">
                 {dayjs(search.created_at).fromNow()}
               </Text>
+              <Text className="text-xs text-gray-400">{search.status}</Text>
             </View>
-            <View className={`rounded-full px-3 py-1 ${
-              search.status === 'Done' ? 'bg-green-100' : 
-              search.status === 'Scraping' ? 'bg-blue-100' : 
-              'bg-gray-100'
-            }`}>
-              <Text className={`text-xs font-semibold ${
-                search.status === 'Done' ? 'text-green-700' : 
-                search.status === 'Scraping' ? 'text-blue-700' : 
-                'text-gray-700'
-              }`}>
-                {search.status}
-              </Text>
-            </View>
+            <Pressable onPress={toggleIsTracked} className="p-2">
+              <Octicons
+                name={search.is_tracked ? 'bell-fill' : 'bell'}
+                size={22}
+                color="dimgray"
+              />
+            </Pressable>
           </View>
           
           {!DEV_MODE_SKIP_DB && search.status === 'Pending' && (
-            <Pressable
+            <Button
+              title="Start scraping"
               onPress={startScraping}
-              className="rounded-lg bg-teal-600 py-3 shadow-sm active:bg-teal-700">
-              <Text className="text-center text-sm font-semibold text-white">
-                Start Scraping
-              </Text>
-            </Pressable>
+            />
           )}
         </View>
       )}

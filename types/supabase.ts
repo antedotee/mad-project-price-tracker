@@ -18,6 +18,7 @@ export interface Database {
           status: 'Pending' | 'Scraping' | 'Done' | 'Failed'
           snapshot_id: string | null
           user_id: string
+          is_tracked: boolean | null
         }
         Insert: {
           id?: string
@@ -27,6 +28,7 @@ export interface Database {
           status?: 'Pending' | 'Scraping' | 'Done' | 'Failed'
           snapshot_id?: string | null
           user_id: string
+          is_tracked?: boolean | null
         }
         Update: {
           id?: string
@@ -36,6 +38,7 @@ export interface Database {
           status?: 'Pending' | 'Scraping' | 'Done' | 'Failed'
           snapshot_id?: string | null
           user_id?: string
+          is_tracked?: boolean | null
         }
       }
       products: {
