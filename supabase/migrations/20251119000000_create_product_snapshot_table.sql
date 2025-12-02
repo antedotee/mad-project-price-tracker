@@ -49,3 +49,5 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
 -- Comment explaining the schema
 COMMENT ON TABLE product_snapshot IS 'Stores historical price snapshots for products to track price changes over time';
 
+
+

@@ -14,3 +14,5 @@ UPDATE searches SET is_tracked = false WHERE is_tracked IS NULL;
 -- Add comment explaining the column
 COMMENT ON COLUMN searches.is_tracked IS 'Indicates whether the user wants to track this search for price alerts';
 
+
+
