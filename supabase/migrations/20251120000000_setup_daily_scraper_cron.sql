@@ -29,3 +29,4 @@ SELECT cron.schedule(
 -- Comment explaining the cron job
 COMMENT ON EXTENSION pg_cron IS 'Enables scheduled jobs to run automatically';
 
+

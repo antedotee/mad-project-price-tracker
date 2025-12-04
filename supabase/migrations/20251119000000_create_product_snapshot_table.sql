@@ -51,3 +51,4 @@ COMMENT ON TABLE product_snapshot IS 'Stores historical price snapshots for prod
 
 
 
+

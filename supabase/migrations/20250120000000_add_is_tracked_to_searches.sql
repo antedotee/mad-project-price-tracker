@@ -16,3 +16,4 @@ COMMENT ON COLUMN searches.is_tracked IS 'Indicates whether the user wants to tr
 
 
 
+
