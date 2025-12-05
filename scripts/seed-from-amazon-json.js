@@ -1,45 +1,39 @@
 #!/usr/bin/env node
 
 /**
- * Script to seed products from products.json directly into Supabase database
- * This bypasses the need for BrightData API
+ * Script to seed products from Amazon products search.json to Supabase database
  * 
  * Usage: 
- *   node scripts/seed-products-to-db.js [limit]
+ *   node scripts/seed-from-amazon-json.js [limit]
  * 
  * Example:
- *   node scripts/seed-products-to-db.js 50
+ *   node scripts/seed-from-amazon-json.js 50
  */
 
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
-// Try to load environment variables (optional)
+// Try to load environment variables
 try {
-  // Try .env.local first, then .env
   require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
   require('dotenv').config({ path: path.join(__dirname, '../.env') });
-} catch (e) {
-  // dotenv not installed, use process.env directly
-}
+} catch (e) {}
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-// Use service role key for seeding (bypasses RLS) or fallback to anon key
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Error: Supabase URL and Key must be set');
-  console.error('   Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or EXPO_PUBLIC_SUPABASE_ANON_KEY)');
+  console.error('❌ Error: Supabase URL and Anon Key must be set');
+  console.error('   Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
   process.exit(1);
 }
 
-// Use service role key if available (bypasses RLS for seeding)
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Read products.json
-const productsPath = path.join(__dirname, '../assets/products.json');
-const allProducts = JSON.parse(fs.readFileSync(productsPath, 'utf8'));
+// Read Amazon products search.json
+const amazonProductsPath = path.join(__dirname, '../assets/Amazon products search.json');
+const allProducts = JSON.parse(fs.readFileSync(amazonProductsPath, 'utf8'));
 
 // Get limit from command line or default to 50
 const limit = parseInt(process.argv[2]) || 50;
@@ -47,7 +41,7 @@ const productsToSeed = allProducts
   .filter(p => p.asin && p.name && p.final_price > 0)
   .slice(0, limit);
 
-console.log(`📦 Seeding ${productsToSeed.length} products to database...`);
+console.log(`📦 Seeding ${productsToSeed.length} products from Amazon products search.json to database...`);
 console.log(`   Supabase URL: ${supabaseUrl}`);
 
 async function seedProducts() {
@@ -100,11 +94,13 @@ async function seedProducts() {
       }
     }
 
-    console.log('\n🎉 Seeding completed successfully!');
-    console.log('\nNext steps:');
-    console.log('1. Create a search and link products to it');
-    console.log('2. Enable price tracking: UPDATE searches SET is_tracked = true WHERE id = \'your-search-id\'');
-    console.log('3. Trigger price simulation: See NO_BRIGHTDATA_SETUP.md');
+    // Verify count
+    const { count } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true });
+
+    console.log(`\n🎉 Seeding completed successfully!`);
+    console.log(`   Total products in database: ${count}`);
 
   } catch (error) {
     console.error('❌ Error seeding products:', error.message);

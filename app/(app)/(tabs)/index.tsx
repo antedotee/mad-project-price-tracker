@@ -82,11 +82,11 @@ export default function Home() {
     if (DEV_MODE_SKIP_DB) {
       setDisplayedProducts(allProducts.slice(0, 50));
     } else {
-      // Load products from database
+      // Load all products from database (no limit to get all products)
       supabase
         .from('products')
         .select('*')
-        .limit(50)
+        .order('created_at', { ascending: false })
         .then(({ data, error }) => {
           if (!error && data) {
             // Convert database products to display format and enrich with ratings
@@ -99,7 +99,9 @@ export default function Home() {
               currency: p.currency || 'USD',
             }));
             setDisplayedProducts(products);
+            console.log(`✅ Loaded ${products.length} products from remote database`);
           } else {
+            console.error('Error fetching products:', error);
             // Fallback to JSON
             setDisplayedProducts(allProducts.slice(0, 50));
           }
@@ -483,21 +485,19 @@ export default function Home() {
       }
 
       if (searchToTrack) {
+        // Immediately refresh history to show the new search in recent searches
         fetchHistory();
         // Update current search if it matches
         if (currentSearch?.id === searchToTrack.id) {
           setCurrentSearch(searchToTrack);
         }
-        // Don't call fetchTrackedProducts immediately - we've already manually updated the map
-        // The manual update will persist, and real-time subscriptions will handle other updates
-        // Only refresh after a longer delay to sync with database state (for edge cases)
+        // Refresh tracked products to ensure UI is in sync
+        // Use a small delay to allow database to settle
         setTimeout(() => {
-          // Only refresh if the product is still in our manual update set
-          // This means the update completed successfully
-          if (manualUpdateInProgress.has(product.asin)) {
-            fetchTrackedProducts(manualUpdateInProgress);
-          }
-        }, 1500);
+          fetchTrackedProducts(manualUpdateInProgress);
+          // Also refresh history again to ensure it's up to date
+          fetchHistory();
+        }, 500);
       }
     } catch (error) {
       console.error('Error tracking product:', error);
@@ -641,11 +641,11 @@ export default function Home() {
       if (DEV_MODE_SKIP_DB) {
         setDisplayedProducts(allProducts.slice(0, 50));
       } else {
-        // Load from database
+        // Load all products from database (no limit)
         supabase
           .from('products')
           .select('*')
-          .limit(50)
+          .order('created_at', { ascending: false })
           .then(({ data }) => {
             if (data) {
               const products = data.map(p => enrichProductWithRating({
