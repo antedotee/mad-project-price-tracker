@@ -31,6 +31,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create trigger that fires after a search is updated
+DROP TRIGGER IF EXISTS "InvokeCheckSearchPriceDropsOnUpdatedSearch" ON public.searches;
 CREATE TRIGGER "InvokeCheckSearchPriceDropsOnUpdatedSearch"
   AFTER UPDATE ON public.searches
   FOR EACH ROW

@@ -27,6 +27,11 @@ CREATE INDEX IF NOT EXISTS idx_price_drop_alerts_is_read ON price_drop_alerts(is
 ALTER TABLE "public"."price_drop_alerts" ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for price_drop_alerts table
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view their own price drop alerts" ON price_drop_alerts;
+DROP POLICY IF EXISTS "Users can update their own price drop alerts" ON price_drop_alerts;
+DROP POLICY IF EXISTS "Service role can insert price drop alerts" ON price_drop_alerts;
+
 -- Users can only see their own alerts
 CREATE POLICY "Users can view their own price drop alerts"
   ON price_drop_alerts FOR SELECT
