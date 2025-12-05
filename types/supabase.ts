@@ -133,6 +133,50 @@ export interface Database {
           bio?: string | null
         }
       }
+      price_drop_alerts: {
+        Row: {
+          id: string
+          created_at: string
+          search_id: string
+          asin: string
+          product_name: string
+          product_url: string | null
+          old_price: number
+          new_price: number
+          price_drop_amount: number
+          price_drop_percent: number
+          is_read: boolean
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          search_id: string
+          asin: string
+          product_name: string
+          product_url?: string | null
+          old_price: number
+          new_price: number
+          price_drop_amount: number
+          price_drop_percent: number
+          is_read?: boolean
+          user_id: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          search_id?: string
+          asin?: string
+          product_name?: string
+          product_url?: string | null
+          old_price?: number
+          new_price?: number
+          price_drop_amount?: number
+          price_drop_percent?: number
+          is_read?: boolean
+          user_id?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

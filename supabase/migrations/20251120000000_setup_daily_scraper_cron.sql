@@ -30,3 +30,5 @@ SELECT cron.schedule(
 COMMENT ON EXTENSION pg_cron IS 'Enables scheduled jobs to run automatically';
 
 
+
+

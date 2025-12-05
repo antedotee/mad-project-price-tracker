@@ -71,8 +71,84 @@ Deno.serve(async (req) => {
         product.snapshots[0].final_price < product.snapshots[1].final_price,
     );
 
+    let alertsCreated = 0;
+
     if (priceDrops.length > 0) {
-      // Notify the user
+      // Get the search to find user_id and check if it's tracked
+      const { data: searchData, error: searchError } = await supabase
+        .from("searches")
+        .select("user_id, is_tracked")
+        .eq("id", record.id)
+        .single();
+
+      if (!searchError && searchData) {
+        // Only create alerts if the search is tracked
+        if (!searchData.is_tracked) {
+          console.log(`Search ${record.id} is not tracked, skipping alert creation`);
+          return new Response(
+            JSON.stringify({
+              message: "Price check completed",
+              priceDropsCount: priceDrops.length,
+              alertsCreated: 0,
+              reason: "Search is not tracked",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        // Check for existing alerts to avoid duplicates
+        // Get existing alert ASINs for this search
+        const { data: existingAlerts } = await supabase
+          .from("price_drop_alerts")
+          .select("asin")
+          .eq("search_id", record.id)
+          .eq("is_read", false);
+
+        const existingAsins = new Set(existingAlerts?.map((a: any) => a.asin) || []);
+
+        // Create price drop alerts, filtering out duplicates
+        const alerts = priceDrops
+          .filter((product: any) => !existingAsins.has(product.asin))
+          .map((product: any) => {
+            const oldPrice = product.snapshots[1].final_price;
+            const newPrice = product.snapshots[0].final_price;
+            const dropAmount = oldPrice - newPrice;
+            const dropPercent = ((dropAmount / oldPrice) * 100);
+
+            return {
+              search_id: record.id,
+              asin: product.asin,
+              product_name: product.name,
+              product_url: product.url,
+              old_price: oldPrice,
+              new_price: newPrice,
+              price_drop_amount: Math.round(dropAmount * 100) / 100,
+              price_drop_percent: Math.round(dropPercent * 100) / 100,
+              user_id: searchData.user_id,
+              is_read: false,
+            };
+          });
+
+        if (alerts.length === 0) {
+          console.log("No new alerts to create (all price drops already have alerts)");
+        } else {
+          // Insert alerts into database
+          const { error: alertsError } = await supabase
+            .from("price_drop_alerts")
+            .insert(alerts);
+
+          if (alertsError) {
+            console.error("Error inserting price drop alerts:", alertsError);
+          } else {
+            alertsCreated = alerts.length;
+            console.log(`Successfully created ${alerts.length} price drop alerts`);
+          }
+        }
+      }
+
+      // Log for debugging
       const message = `
         There are ${priceDrops.length} price drops in your search!
 
@@ -91,14 +167,13 @@ Deno.serve(async (req) => {
       `;
 
       console.log(message);
-      
-      // TODO: Add notification logic here (push notifications, email, etc.)
     }
 
     return new Response(
       JSON.stringify({
         message: "Price check completed",
         priceDropsCount: priceDrops.length,
+        alertsCreated: alertsCreated,
       }),
       {
         headers: { "Content-Type": "application/json" },

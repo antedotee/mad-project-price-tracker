@@ -32,7 +32,7 @@ type Search = {
 };
 
 // Development mode: Use local JSON data for testing
-const DEV_MODE_SKIP_DB = true; // Using local products.json for demo
+const DEV_MODE_SKIP_DB = false; // Set to false to use actual database
 
 // Function to filter products based on search query
 const filterProductsByQuery = (products: Product[], query: string): Product[] => {
@@ -130,13 +130,17 @@ export default function SearchResultScreen() {
       .from('product_search')
       .select('*, products(*)')
       .eq('search_id', searchId)
+      .order('created_at', { foreignTable: 'products', ascending: false })
       .then(({ data, error }) => {
-        console.log(data, error);
+        console.log('Fetched products:', data?.length, error);
         if (error) {
           console.log('Error fetching products:', error.message);
           return;
         }
-        setProducts(data?.map((d) => d.products) || []);
+        // Filter out null products and map to product objects
+        const validProducts = data?.map((d) => d.products).filter((p) => p !== null) || [];
+        console.log(`Loaded ${validProducts.length} products from database`);
+        setProducts(validProducts);
       });
   }, [id]);
 

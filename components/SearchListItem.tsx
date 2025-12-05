@@ -3,6 +3,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { Link } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { Octicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 
 import { Tables } from '~/types/supabase';
 import { supabase } from '~/utils/supabase';
@@ -15,20 +16,65 @@ type SearchListItemProps = {
 };
 
 export default function SearchListItem({ search, onToggleTracked }: SearchListItemProps) {
+  const [isTracked, setIsTracked] = useState(search?.is_tracked || false);
+
+  // Update local state when search prop changes
+  useEffect(() => {
+    setIsTracked(search?.is_tracked || false);
+  }, [search?.is_tracked]);
+
+  // Real-time subscription for this specific search
+  useEffect(() => {
+    if (!search?.id) return;
+
+    const subscription = supabase
+      .channel(`search-${search.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'searches',
+          filter: `id=eq.${search.id}`,
+        },
+        (payload) => {
+          console.log('Search updated in real-time:', payload.new);
+          setIsTracked((payload.new as Tables<'searches'>).is_tracked || false);
+          onToggleTracked?.();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [search?.id, onToggleTracked]);
+
   const toggleIsTracked = async () => {
     if (!search?.id) {
       return;
     }
 
+    // Optimistically update UI
+    const newTrackedState = !isTracked;
+    setIsTracked(newTrackedState);
+    onToggleTracked?.(); // Notify parent immediately for UI responsiveness
+
     const { data, error } = await supabase
       .from('searches')
-      .update({ is_tracked: !search?.is_tracked })
+      .update({ is_tracked: newTrackedState })
       .eq('id', search?.id)
       .select()
       .single();
 
-    if (!error && data) {
-      onToggleTracked?.();
+    if (error) {
+      // Revert on error
+      setIsTracked(!newTrackedState);
+      console.error('Error toggling tracking:', error);
+      onToggleTracked?.(); // Revert parent
+    } else if (data) {
+      // Confirm state (optional, but good for consistency)
+      setIsTracked(data.is_tracked || false);
     }
   };
 
@@ -50,9 +96,9 @@ export default function SearchListItem({ search, onToggleTracked }: SearchListIt
           }}
           className="p-2">
           <Octicons
-            name={search.is_tracked ? 'bell-fill' : 'bell'}
+            name={isTracked ? 'bell-fill' : 'bell'}
             size={22}
-            color="dimgray"
+            color={isTracked ? '#0d9488' : 'dimgray'}
           />
         </Pressable>
       </Pressable>

@@ -34,36 +34,41 @@ export default function ProductDetailsScreen() {
 
   const { asin } = useLocalSearchParams<{ asin: string }>();
 
-  useEffect(() => {
-    const asinValue = Array.isArray(asin) ? asin[0] : asin;
-    
-    if (!asinValue) {
-      setIsLoading(false);
-      return;
-    }
-
+  const fetchProductData = async (asinValue: string) => {
     setIsLoading(true);
     
-    // First, try to fetch from Supabase
-    supabase
-      .from('products')
-      .select('*, product_snapshot(*)')
-      .eq('asin', asinValue)
-      .single()
-      .then(({ data, error }) => {
-        if (data && !error) {
-          // Product found in Supabase
-          setProduct({
-            asin: data.asin,
-            name: data.name,
-            image: data.image,
-            url: data.url,
-            final_price: data.final_price,
-            currency: data.currency,
-          });
-          setProductSnapshots(data?.product_snapshot || []);
-          setIsLoading(false);
-        } else {
+    // Fetch product and snapshots separately for better ordering
+    Promise.all([
+      // Fetch product
+      supabase
+        .from('products')
+        .select('*')
+        .eq('asin', asinValue)
+        .single(),
+      // Fetch snapshots with proper ordering
+      supabase
+        .from('product_snapshot')
+        .select('*')
+        .eq('asin', asinValue)
+        .order('created_at', { ascending: false })
+    ]).then(([productResult, snapshotsResult]) => {
+      if (productResult.data && !productResult.error) {
+        // Product found in Supabase
+        setProduct({
+          asin: productResult.data.asin,
+          name: productResult.data.name,
+          image: productResult.data.image,
+          url: productResult.data.url,
+          final_price: productResult.data.final_price,
+          currency: productResult.data.currency,
+        });
+        
+        // Set snapshots (already ordered by query)
+        const snapshots = snapshotsResult.data || [];
+        console.log(`Loaded ${snapshots.length} price snapshots for product ${asinValue}`);
+        setProductSnapshots(snapshots);
+        setIsLoading(false);
+      } else {
           // Product not found in Supabase, try JSON fallback
           const jsonProduct = allProducts.find((p: JsonProduct) => p.asin === asinValue);
           
@@ -88,6 +93,73 @@ export default function ProductDetailsScreen() {
           }
         }
       });
+  };
+
+  useEffect(() => {
+    const asinValue = Array.isArray(asin) ? asin[0] : asin;
+    
+    if (!asinValue) {
+      setIsLoading(false);
+      return;
+    }
+
+    fetchProductData(asinValue);
+
+    // Set up real-time subscription for price snapshots
+    const subscription = supabase
+      .channel(`product-snapshots-${asinValue}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'product_snapshot',
+          filter: `asin=eq.${asinValue}`,
+        },
+        (payload) => {
+          console.log('✅ New snapshot received via real-time:', payload.new);
+          // Add new snapshot to the list (at the beginning since we want newest first)
+          setProductSnapshots(prev => [payload.new as Tables<'product_snapshot'>, ...prev]);
+          
+          // Also update product price if it changed
+          if (payload.new && 'final_price' in payload.new) {
+            setProduct(prev => prev ? {
+              ...prev,
+              final_price: payload.new.final_price as number,
+            } : null);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+          filter: `asin=eq.${asinValue}`,
+        },
+        (payload) => {
+          console.log('✅ Product updated via real-time:', payload.new);
+          if (payload.new && product) {
+            setProduct({
+              ...product,
+              final_price: payload.new.final_price as number | null,
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time subscription active for product:', asinValue);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time subscription error for product:', asinValue);
+        }
+      });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [asin]);
 
   if (isLoading) {
@@ -112,15 +184,42 @@ export default function ProductDetailsScreen() {
       <FlatList
         data={productSnapshots}
         contentContainerClassName="gap-3 pb-6"
-        renderItem={({ item }) => (
-          <View className="flex flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-            <View className="flex-1">
-              <Text className="text-sm text-gray-600">{dayjs(item.created_at).format('MMMM D, YYYY')}</Text>
-              <Text className="text-xs text-gray-400">{dayjs(item.created_at).format('h:mm A')}</Text>
+        renderItem={({ item, index }) => {
+          const previousSnapshot = productSnapshots[index + 1];
+          const priceChanged = previousSnapshot && previousSnapshot.final_price !== item.final_price;
+          const priceDropped = previousSnapshot && item.final_price < previousSnapshot.final_price;
+          const priceIncreased = previousSnapshot && item.final_price > previousSnapshot.final_price;
+          
+          return (
+            <View className="flex flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+              <View className="flex-1">
+                <Text className="text-sm text-gray-600">{dayjs(item.created_at).format('MMMM D, YYYY')}</Text>
+                <Text className="text-xs text-gray-400">{dayjs(item.created_at).format('h:mm A')}</Text>
+                {priceDropped && (
+                  <Text className="text-xs text-red-600 font-semibold mt-1">
+                    ↓ Price dropped from ${previousSnapshot.final_price.toFixed(2)}
+                  </Text>
+                )}
+                {priceIncreased && (
+                  <Text className="text-xs text-green-600 font-semibold mt-1">
+                    ↑ Price increased from ${previousSnapshot.final_price.toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View className="items-end">
+                <Text className={`text-lg font-bold ${priceDropped ? 'text-red-600' : priceIncreased ? 'text-green-600' : 'text-teal-600'}`}>
+                  ${item.final_price.toFixed(2)}
+                </Text>
+                {priceChanged && previousSnapshot && (
+                  <Text className={`text-xs mt-1 ${priceDropped ? 'text-red-600' : 'text-green-600'}`}>
+                    {priceDropped ? '↓' : '↑'} ${Math.abs(item.final_price - previousSnapshot.final_price).toFixed(2)}
+                    ({Math.abs(((item.final_price - previousSnapshot.final_price) / previousSnapshot.final_price) * 100).toFixed(1)}%)
+                  </Text>
+                )}
+              </View>
             </View>
-            <Text className="text-lg font-bold text-teal-600">${item.final_price}</Text>
-          </View>
-        )}
+          );
+        }}
         ListHeaderComponent={
           <View className="gap-4">
             {/* Product Image Section */}
